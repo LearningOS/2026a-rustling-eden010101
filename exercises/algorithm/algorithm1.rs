@@ -2,8 +2,6 @@
 	single linked list merge
 	This problem requires you to merge two ordered singly linked lists into one ordered singly linked list
 */
-// I AM NOT DONE
-
 use std::fmt::{self, Display, Formatter};
 use std::ptr::NonNull;
 use std::vec::*;
@@ -69,15 +67,47 @@ impl<T> LinkedList<T> {
             },
         }
     }
-	pub fn merge(list_a:LinkedList<T>,list_b:LinkedList<T>) -> Self
+	pub fn merge(mut list_a:LinkedList<T>, mut list_b:LinkedList<T>) -> Self where T: Ord
 	{
-		//TODO
-		Self {
-            length: 0,
-            start: None,
-            end: None,
+        let mut result = Self::new();
+        let mut a = list_a.start.take();
+        let mut b = list_b.start.take();
+        result.length = list_a.length + list_b.length;
+        list_a.end = None; list_a.length = 0;
+        list_b.end = None; list_b.length = 0;
+        while a.is_some() || b.is_some() {
+            let take_a = match (a, b) {
+                (Some(left), Some(right)) => {
+                    // SAFETY: Both pointers belong to live, exclusively owned input chains.
+                    unsafe { left.as_ref().val <= right.as_ref().val }
+                }
+                (Some(_), None) => true,
+                _ => false,
+            };
+            let mut node = if take_a { a.unwrap() } else { b.unwrap() };
+            // SAFETY: Each node is detached once and transferred to the output chain.
+            unsafe {
+                let next = node.as_ref().next;
+                if take_a { a = next; } else { b = next; }
+                node.as_mut().next = None;
+                if let Some(mut tail) = result.end { tail.as_mut().next = Some(node); }
+                else { result.start = Some(node); }
+            }
+            result.end = Some(node);
         }
-	}
+        result
+    }
+}
+
+impl<T> Drop for LinkedList<T> {
+    fn drop(&mut self) {
+        let mut current = self.start.take();
+        while let Some(pointer) = current {
+            // SAFETY: Each allocation was made by Box::into_raw and is recovered once.
+            let node = unsafe { Box::from_raw(pointer.as_ptr()) };
+            current = node.next;
+        }
+    }
 }
 
 impl<T> Display for LinkedList<T>
